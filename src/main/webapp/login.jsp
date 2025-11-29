@@ -132,7 +132,7 @@
         </button>
         <div class="collapse navbar-collapse" id="buymeNav">
             <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
-                <li class="nav-item"><a class="nav-link" href="#">Browse</a></li>
+                <li class="nav-item"><a class="nav-link" href="browse">Browse</a></li>
                 <li class="nav-item"><a class="nav-link" href="#">Sell</a></li>
                 <li class="nav-item"><a class="nav-link" href="#">Alerts</a></li>
                 <li class="nav-item"><a class="nav-link" href="#">Support</a></li>
