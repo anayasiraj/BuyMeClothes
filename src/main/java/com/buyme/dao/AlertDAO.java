@@ -1,6 +1,7 @@
 package com.buyme.dao;
 
 import com.buyme.model.Alert;
+import com.buyme.model.AuctionSummary;
 import com.buyme.util.DBUtil;
 
 import java.math.BigDecimal;
@@ -110,5 +111,76 @@ public class AlertDAO {
             ps.setInt(2, userId);
             ps.executeUpdate();
         }
+    }
+
+    // ---------------------------------------------------------------------
+    // Helper: check if a given auction matches a given alert's preferences
+    // ---------------------------------------------------------------------
+    public boolean matchesAuction(AuctionSummary auction, Alert alert) {
+        if (auction == null || alert == null) return false;
+
+        // 1) Price range: use display price = current_high or start_price
+        BigDecimal price = (auction.getCurrentHigh() != null)
+                ? auction.getCurrentHigh()
+                : auction.getStartPrice();
+
+        if (price != null) {
+            BigDecimal min = alert.getMinPrice();
+            BigDecimal max = alert.getMaxPrice();
+
+            if (min != null && price.compareTo(min) < 0) {
+                return false;
+            }
+            if (max != null && price.compareTo(max) > 0) {
+                return false;
+            }
+        }
+
+        // 2) Size
+        String sizePref = safe(alert.getSizePref());
+        if (!sizePref.isEmpty()) {
+            String auctionSize = safe(auction.getSize());
+            if (auctionSize.isEmpty() || !auctionSize.equalsIgnoreCase(sizePref)) {
+                return false;
+            }
+        }
+
+        // 3) Color (substring match, case-insensitive)
+        String colorPref = safe(alert.getColorPref());
+        if (!colorPref.isEmpty()) {
+            String auctionColor = safe(auction.getColor());
+            if (auctionColor.isEmpty()
+                    || !auctionColor.toLowerCase().contains(colorPref.toLowerCase())) {
+                return false;
+            }
+        }
+
+        // 4) Keyword in title or brand
+        String keyword = safe(alert.getKeyword());
+        if (!keyword.isEmpty()) {
+            String title = safe(auction.getTitle());
+            String brand = safe(auction.getBrand());
+            String haystack = (title + " " + brand).toLowerCase();
+            if (!haystack.contains(keyword.toLowerCase())) {
+                return false;
+            }
+        }
+
+        // 5) Category (match by category name, since Alert has categoryName)
+        Integer alertCategoryId = alert.getCategoryId();
+        String alertCategoryName = safe(alert.getCategoryName());
+        if (alertCategoryId != null || !alertCategoryName.isEmpty()) {
+            String auctionCategory = safe(auction.getCategoryName());
+            if (auctionCategory.isEmpty()
+                    || !auctionCategory.equalsIgnoreCase(alertCategoryName)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private String safe(String s) {
+        return (s == null) ? "" : s.trim();
     }
 }

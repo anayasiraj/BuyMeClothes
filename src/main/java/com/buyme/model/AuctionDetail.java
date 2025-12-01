@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 
 public class AuctionDetail {
+
     private int auctionId;
     private String title;
     private String description;
@@ -23,6 +24,12 @@ public class AuctionDetail {
     private String photoUrl1;
     private String photoUrl2;
     private String photoUrl3;
+
+    // NEW: status / winner info
+    private String status;          // "open", "closed"
+    private Integer winnerId;       // nullable
+    private String winnerUsername;  // nullable
+    private BigDecimal closingPrice; // nullable
 
     // --- getters & setters ---
 
@@ -152,5 +159,39 @@ public class AuctionDetail {
 
     public void setPhotoUrl3(String photoUrl3) {
         this.photoUrl3 = photoUrl3;
+    }
+
+    // --- NEW fields ---
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public Integer getWinnerId() {
+        return winnerId;
+    }
+
+    public void setWinnerId(Integer winnerId) {
+        this.winnerId = winnerId;
+    }
+
+    public String getWinnerUsername() {
+        return winnerUsername;
+    }
+
+    public void setWinnerUsername(String winnerUsername) {
+        this.winnerUsername = winnerUsername;
+    }
+
+    public BigDecimal getClosingPrice() {
+        return closingPrice;
+    }
+
+    public void setClosingPrice(BigDecimal closingPrice) {
+        this.closingPrice = closingPrice;
     }
 }

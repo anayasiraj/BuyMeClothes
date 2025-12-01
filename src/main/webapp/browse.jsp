@@ -101,7 +101,7 @@
                 <%
                     }
                 %>
-                
+
                 <%-- REP-ONLY LINK --%>
                 <%
                     String role1 = (String) session.getAttribute("role");
@@ -122,6 +122,20 @@
     </div>
 </nav>
 
+<%
+    // Pop-up message when auctions match user's alerts
+    String alertPopup = (String) request.getAttribute("alertPopup");
+    if (alertPopup != null) {
+%>
+    <div class="container mt-3">
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            <%= alertPopup %>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    </div>
+<%
+    }
+%>
 
 <%
     // Current filters (so we can pre-fill the search + modal)

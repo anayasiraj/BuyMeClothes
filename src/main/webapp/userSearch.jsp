@@ -140,7 +140,7 @@
                     <th scope="col">Username</th>
                     <th scope="col">Email</th>
                     <th scope="col">Role</th>
-                    <th scope="col" class="text-end"></th>
+                    <th scope="col" class="text-end">Actions</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -153,10 +153,29 @@
                     <td><%= u.getEmail() %></td>
                     <td><span class="badge-role"><%= u.getRole() %></span></td>
                     <td class="text-end">
-                        <a class="btn btn-sm btn-outline-primary"
+                        <!-- Edit profile -->
+                        <a class="btn btn-sm btn-outline-primary me-2"
                            href="${pageContext.request.contextPath}/rep/editUser?user_id=<%= u.getUserId() %>">
                             Edit profile
                         </a>
+
+                        <!-- Delete account (admin / cust_rep only) -->
+                        <%
+                            if ("admin".equals(role) || "cust_rep".equals(role)) {
+                        %>
+                        <form action="${pageContext.request.contextPath}/rep/deleteUser"
+                              method="post"
+                              class="d-inline">
+                            <input type="hidden" name="user_id" value="<%= u.getUserId() %>">
+                            <button type="submit"
+                                    class="btn btn-sm btn-outline-danger"
+                                    onclick="return confirm('Delete user <%= u.getUsername() %>? This cannot be undone.');">
+                                Delete
+                            </button>
+                        </form>
+                        <%
+                            }
+                        %>
                     </td>
                 </tr>
                 <%

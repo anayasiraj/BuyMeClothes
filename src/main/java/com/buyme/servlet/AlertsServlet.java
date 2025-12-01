@@ -61,7 +61,7 @@ public class AlertsServlet extends HttpServlet {
                 dao.deleteAlert(alertId, userId);
             } catch (Exception e) {
                 e.printStackTrace();
-                // you could stash a flash message in session if you want
+                // optional: flash message here
             }
             response.sendRedirect("alerts");
             return;

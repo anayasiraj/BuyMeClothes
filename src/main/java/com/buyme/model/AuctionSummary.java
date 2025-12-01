@@ -2,7 +2,6 @@ package com.buyme.model;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
-import java.time.LocalDateTime;
 
 public class AuctionSummary {
     private int auctionId;
@@ -16,6 +15,9 @@ public class AuctionSummary {
     private String photoUrl;
     private String categoryName;
 
+    // NEW: status (open / closed / cancelled / scheduled)
+    private String status;
+
     public String getCategoryName() {
         return categoryName;
     }
@@ -23,7 +25,6 @@ public class AuctionSummary {
     public void setCategoryName(String categoryName) {
         this.categoryName = categoryName;
     }
-
 
     public int getAuctionId() {
         return auctionId;
@@ -85,8 +86,8 @@ public class AuctionSummary {
         return endTime;
     }
 
-    public void setEndTime(Timestamp timestamp) {
-        this.endTime = timestamp;
+    public void setEndTime(Timestamp endTime) {
+        this.endTime = endTime;
     }
 
     public String getPhotoUrl() {
@@ -95,5 +96,14 @@ public class AuctionSummary {
 
     public void setPhotoUrl(String photoUrl) {
         this.photoUrl = photoUrl;
+    }
+
+    // NEW getter/setter
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 }

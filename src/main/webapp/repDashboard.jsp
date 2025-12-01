@@ -34,7 +34,7 @@
             text-decoration: underline;
         }
         .page-wrap {
-            max-width: 1000px;
+            max-width: 1100px;
             margin: 40px auto;
             padding: 0 24px;
         }
@@ -111,12 +111,12 @@
 <div class="page-wrap">
     <div class="headline">Customer support tools</div>
     <div class="subtitle">
-        Look up users, reset credentials, and keep auctions fair for buyers and sellers.
+        Look up users, reset credentials, remove problematic bids and auctions, and keep things fair.
     </div>
 
     <div class="row g-4">
         <!-- Search users -->
-        <div class="col-md-4">
+        <div class="col-md-3">
             <a href="${pageContext.request.contextPath}/rep/searchUsers"
                class="text-decoration-none text-reset">
                 <div class="action-card">
@@ -132,7 +132,7 @@
         </div>
 
         <!-- Edit user profile -->
-        <div class="col-md-4">
+        <div class="col-md-3">
             <a href="${pageContext.request.contextPath}/rep/editUser"
                class="text-decoration-none text-reset">
                 <div class="action-card">
@@ -147,8 +147,8 @@
             </a>
         </div>
 
-        <!-- NEW: Delete auctions -->
-        <div class="col-md-4">
+        <!-- Delete auctions -->
+        <div class="col-md-3">
             <a href="${pageContext.request.contextPath}/rep/auctions"
                class="text-decoration-none text-reset">
                 <div class="action-card">
@@ -159,6 +159,22 @@
                         that violate marketplace rules.
                     </div>
                     <button type="button" class="btn-main">Delete auctions</button>
+                </div>
+            </a>
+        </div>
+
+        <!-- NEW: Manage bids -->
+        <div class="col-md-3">
+            <a href="${pageContext.request.contextPath}/rep/bids"
+               class="text-decoration-none text-reset">
+                <div class="action-card">
+                    <span class="pill">Bids</span>
+                    <div class="action-title mt-2">Manage bids</div>
+                    <div class="action-desc">
+                        View bids on any auction and remove abusive or mistaken bids
+                        while keeping current prices consistent.
+                    </div>
+                    <button type="button" class="btn-main">Manage bids</button>
                 </div>
             </a>
         </div>

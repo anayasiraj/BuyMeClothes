@@ -61,11 +61,6 @@ public class AuctionDAO {
 
     // ------------------------------------------------------------------
     // 1b. Browse page – search + filters
-    //      q        : text in title/brand
-    //      size     : exact match
-    //      color    : LIKE
-    //      category : category name LIKE
-    //      minPrice/maxPrice : price range on IFNULL(current_high, start_price)
     // ------------------------------------------------------------------
     public List<AuctionSummary> searchAuctions(
             String q,
@@ -119,14 +114,12 @@ public class AuctionDAO {
             params.add("%" + category.trim() + "%");
         }
 
-        // Filter on display price = current_high if present, else start_price
         if (minPrice != null && !minPrice.isBlank()) {
             try {
                 Double.valueOf(minPrice.trim()); // validate
                 sql.append(" AND IFNULL(a.current_high, a.start_price) >= ? ");
                 params.add(new BigDecimal(minPrice.trim()));
             } catch (NumberFormatException ignore) {
-                // ignore invalid input
             }
         }
         if (maxPrice != null && !maxPrice.isBlank()) {
@@ -135,7 +128,6 @@ public class AuctionDAO {
                 sql.append(" AND IFNULL(a.current_high, a.start_price) <= ? ");
                 params.add(new BigDecimal(maxPrice.trim()));
             } catch (NumberFormatException ignore) {
-                // ignore invalid input
             }
         }
 
@@ -175,6 +167,9 @@ public class AuctionDAO {
     public AuctionDetail getAuctionDetail(int auctionId) {
         String sql = """
          SELECT a.auction_id,
+                a.status,
+                a.winner_id,
+                a.closing_price,
                 a.start_time,
                 a.end_time,
                 a.start_price,
@@ -189,10 +184,12 @@ public class AuctionDAO {
                 i.photo_url1,
                 i.photo_url2,
                 i.photo_url3,
-                u.username AS seller_username
+                u.username AS seller_username,
+                w.username AS winner_username
          FROM auctions a
          JOIN items i ON a.item_id = i.item_id
          LEFT JOIN users u ON a.seller_id = u.user_id
+         LEFT JOIN users w ON a.winner_id = w.user_id
          WHERE a.auction_id = ?
          """;
 
@@ -205,6 +202,16 @@ public class AuctionDAO {
                 if (rs.next()) {
                     AuctionDetail d = new AuctionDetail();
                     d.setAuctionId(rs.getInt("auction_id"));
+                    d.setStatus(rs.getString("status"));
+
+                    int winnerId = rs.getInt("winner_id");
+                    if (rs.wasNull()) {
+                        d.setWinnerId(null);
+                    } else {
+                        d.setWinnerId(winnerId);
+                    }
+                    d.setClosingPrice(rs.getBigDecimal("closing_price"));
+
                     d.setStartTime(rs.getTimestamp("start_time"));
                     d.setEndTime(rs.getTimestamp("end_time"));
                     d.setStartPrice(rs.getBigDecimal("start_price"));
@@ -226,6 +233,9 @@ public class AuctionDAO {
                         seller = "Unknown seller";
                     }
                     d.setSellerUsername(seller);
+
+                    String winnerUsername = rs.getString("winner_username");
+                    d.setWinnerUsername(winnerUsername);
 
                     return d;
                 }
@@ -308,7 +318,6 @@ public class AuctionDAO {
             conn.setAutoCommit(false);
 
             try {
-                // ---- 5.1 Validate auction + minimum bid ----
                 String status;
                 BigDecimal currentHigh;
                 BigDecimal startPrice;
@@ -349,7 +358,6 @@ public class AuctionDAO {
                     return false;         // too low
                 }
 
-                // ---- 5.2 Insert the manual bid ----
                 String insertBidSql =
                         "INSERT INTO bids (auction_id, bidder_id, amount, is_auto) VALUES (?, ?, ?, 0)";
                 try (PreparedStatement ps = conn.prepareStatement(insertBidSql)) {
@@ -359,7 +367,6 @@ public class AuctionDAO {
                     ps.executeUpdate();
                 }
 
-                // ---- 5.3 Update auction with this new high ----
                 String updateAuctionSql =
                         "UPDATE auctions SET current_high = ?, current_high_bidder_id = ? " +
                         "WHERE auction_id = ?";
@@ -370,7 +377,6 @@ public class AuctionDAO {
                     ps.executeUpdate();
                 }
 
-                // ---- 5.4 Run auto-bid logic to see if anyone outbids ----
                 applyAutoBids(conn, auctionId);
 
                 conn.commit();
@@ -390,7 +396,6 @@ public class AuctionDAO {
     // ------------------------------------------------------------------
     private void applyAutoBids(Connection conn, int auctionId) throws SQLException {
         while (true) {
-            // Read current auction state
             String auctionSql = """
                 SELECT current_high, start_price, bid_increment,
                        current_high_bidder_id, status
@@ -408,7 +413,7 @@ public class AuctionDAO {
             try (PreparedStatement ps = conn.prepareStatement(auctionSql)) {
                 ps.setInt(1, auctionId);
                 try (ResultSet rs = ps.executeQuery()) {
-                    if (!rs.next()) return; // no such auction
+                    if (!rs.next()) return;
                     currentHigh = rs.getBigDecimal("current_high");
                     startPrice = rs.getBigDecimal("start_price");
                     bidIncrement = rs.getBigDecimal("bid_increment");
@@ -424,7 +429,6 @@ public class AuctionDAO {
             BigDecimal base = (currentHigh != null) ? currentHigh : startPrice;
             BigDecimal minNext = base.add(bidIncrement);
 
-            // Find best auto-bidder who can outbid the current price
             String autoSql = """
                 SELECT bidder_id, max_limit
                 FROM auto_bids
@@ -456,18 +460,15 @@ public class AuctionDAO {
                 }
             }
 
-            // No auto-bidder can beat the current price → stop.
             if (autoBidderId == null) {
                 return;
             }
 
-            // Amount that the auto-bidder will bid
             BigDecimal newAmount = minNext;
             if (newAmount.compareTo(maxLimit) > 0) {
                 newAmount = maxLimit;
             }
 
-            // Insert automatic bid
             String insertBidSql =
                     "INSERT INTO bids (auction_id, bidder_id, amount, is_auto) VALUES (?, ?, ?, 1)";
             try (PreparedStatement ps = conn.prepareStatement(insertBidSql)) {
@@ -477,7 +478,6 @@ public class AuctionDAO {
                 ps.executeUpdate();
             }
 
-            // Update auction with new high
             String updateAuctionSql =
                     "UPDATE auctions SET current_high = ?, current_high_bidder_id = ? " +
                     "WHERE auction_id = ?";
@@ -487,8 +487,6 @@ public class AuctionDAO {
                 ps.setInt(3, auctionId);
                 ps.executeUpdate();
             }
-
-            // Loop again in case another auto-bidder can now outbid this one
         }
     }
 
@@ -599,7 +597,6 @@ public class AuctionDAO {
     public List<AuctionSummary> getSimilarAuctions(int auctionId) throws SQLException {
         List<AuctionSummary> list = new ArrayList<>();
 
-        // 1) Get category (and optionally size/brand) for this auction's item
         String infoSql = """
             SELECT i.category_id, i.size, i.brand
             FROM auctions a
@@ -615,7 +612,7 @@ public class AuctionDAO {
             psInfo.setInt(1, auctionId);
             try (ResultSet rs = psInfo.executeQuery()) {
                 if (!rs.next()) {
-                    return list; // no such auction
+                    return list;
                 }
                 categoryId = rs.getInt("category_id");
             }
@@ -673,11 +670,7 @@ public class AuctionDAO {
         return list;
     }
 
- // ------------------------------------------------------------------
- // 10. Create a new item + auction (used by SellServlet)
-//      - Sets status='open'
-//      - reservePrice may be null
- // ------------------------------------------------------------------
+    // 10. Create auction with item (unchanged)
     public int createAuctionWithItem(
             int sellerId,
             String title,
@@ -733,7 +726,6 @@ public class AuctionDAO {
             conn.setAutoCommit(false);
 
             try {
-                // Insert item
                 int itemId;
                 try (PreparedStatement ps = conn.prepareStatement(
                         insertItemSql, Statement.RETURN_GENERATED_KEYS)) {
@@ -755,7 +747,6 @@ public class AuctionDAO {
                     }
                 }
 
-                // Insert auction
                 int auctionId;
                 try (PreparedStatement ps = conn.prepareStatement(
                         insertAuctionSql, Statement.RETURN_GENERATED_KEYS)) {
@@ -789,111 +780,97 @@ public class AuctionDAO {
         }
     }
 
-    
-    
- // ------------------------------------------------------------
- // Delete auction + item + bids (for reps/admin)
- // ------------------------------------------------------------
- public boolean deleteAuction(int auctionId) throws SQLException {
+    // deleteAuction / deleteAuctionById remain as you had them:
 
-     String deleteBidsSql = "DELETE FROM bids WHERE auction_id = ?";
-     String deleteAutoSql = "DELETE FROM auto_bids WHERE auction_id = ?";
-     String getItemSql    = "SELECT item_id FROM auctions WHERE auction_id = ?";
-     String deleteAuctionSql = "DELETE FROM auctions WHERE auction_id = ?";
-     String deleteItemSql = "DELETE FROM items WHERE item_id = ?";
+    public boolean deleteAuction(int auctionId) throws SQLException {
 
-     try (Connection conn = DBUtil.getConnection()) {
+        String deleteBidsSql = "DELETE FROM bids WHERE auction_id = ?";
+        String deleteAutoSql = "DELETE FROM auto_bids WHERE auction_id = ?";
+        String getItemSql    = "SELECT item_id FROM auctions WHERE auction_id = ?";
+        String deleteAuctionSql = "DELETE FROM auctions WHERE auction_id = ?";
+        String deleteItemSql = "DELETE FROM items WHERE item_id = ?";
 
-         conn.setAutoCommit(false);
+        try (Connection conn = DBUtil.getConnection()) {
 
-         try {
-             // 1. Get item_id (needed for deleting from items)
-             int itemId = -1;
-             try (PreparedStatement ps = conn.prepareStatement(getItemSql)) {
-                 ps.setInt(1, auctionId);
-                 try (ResultSet rs = ps.executeQuery()) {
-                     if (!rs.next()) {
-                         conn.rollback();
-                         return false;
-                     }
-                     itemId = rs.getInt("item_id");
-                 }
-             }
+            conn.setAutoCommit(false);
 
-             // 2. Delete all bids for auction
-             try (PreparedStatement ps = conn.prepareStatement(deleteBidsSql)) {
-                 ps.setInt(1, auctionId);
-                 ps.executeUpdate();
-             }
+            try {
+                int itemId = -1;
+                try (PreparedStatement ps = conn.prepareStatement(getItemSql)) {
+                    ps.setInt(1, auctionId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (!rs.next()) {
+                            conn.rollback();
+                            return false;
+                        }
+                        itemId = rs.getInt("item_id");
+                    }
+                }
 
-             // 3. Delete auto-bids
-             try (PreparedStatement ps = conn.prepareStatement(deleteAutoSql)) {
-                 ps.setInt(1, auctionId);
-                 ps.executeUpdate();
-             }
+                try (PreparedStatement ps = conn.prepareStatement(deleteBidsSql)) {
+                    ps.setInt(1, auctionId);
+                    ps.executeUpdate();
+                }
 
-             // 4. Delete auction row
-             try (PreparedStatement ps = conn.prepareStatement(deleteAuctionSql)) {
-                 ps.setInt(1, auctionId);
-                 ps.executeUpdate();
-             }
+                try (PreparedStatement ps = conn.prepareStatement(deleteAutoSql)) {
+                    ps.setInt(1, auctionId);
+                    ps.executeUpdate();
+                }
 
-             // 5. Delete item row
-             try (PreparedStatement ps = conn.prepareStatement(deleteItemSql)) {
-                 ps.setInt(1, itemId);
-                 ps.executeUpdate();
-             }
+                try (PreparedStatement ps = conn.prepareStatement(deleteAuctionSql)) {
+                    ps.setInt(1, auctionId);
+                    ps.executeUpdate();
+                }
 
-             conn.commit();
-             return true;
+                try (PreparedStatement ps = conn.prepareStatement(deleteItemSql)) {
+                    ps.setInt(1, itemId);
+                    ps.executeUpdate();
+                }
 
-         } catch (SQLException ex) {
-             conn.rollback();
-             throw ex;
-         } finally {
-             conn.setAutoCommit(true);
-         }
-     }
- }
- 
- /**
-  * Delete an auction and its related bids / auto_bids.
-  * Returns true if an auction row was actually deleted.
-  */
- public boolean deleteAuctionById(int auctionId) throws SQLException {
-     String deleteBidsSql      = "DELETE FROM bids WHERE auction_id = ?";
-     String deleteAutoBidsSql  = "DELETE FROM auto_bids WHERE auction_id = ?";
-     String deleteAuctionSql   = "DELETE FROM auctions WHERE auction_id = ?";
+                conn.commit();
+                return true;
 
-     try (Connection conn = DBUtil.getConnection()) {
-         conn.setAutoCommit(false);
-         try {
-             try (PreparedStatement ps = conn.prepareStatement(deleteBidsSql)) {
-                 ps.setInt(1, auctionId);
-                 ps.executeUpdate();
-             }
+            } catch (SQLException ex) {
+                conn.rollback();
+                throw ex;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+        }
+    }
 
-             try (PreparedStatement ps = conn.prepareStatement(deleteAutoBidsSql)) {
-                 ps.setInt(1, auctionId);
-                 ps.executeUpdate();
-             }
+    public boolean deleteAuctionById(int auctionId) throws SQLException {
+        String deleteBidsSql      = "DELETE FROM bids WHERE auction_id = ?";
+        String deleteAutoBidsSql  = "DELETE FROM auto_bids WHERE auction_id = ?";
+        String deleteAuctionSql   = "DELETE FROM auctions WHERE auction_id = ?";
 
-             int affected;
-             try (PreparedStatement ps = conn.prepareStatement(deleteAuctionSql)) {
-                 ps.setInt(1, auctionId);
-                 affected = ps.executeUpdate();
-             }
+        try (Connection conn = DBUtil.getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                try (PreparedStatement ps = conn.prepareStatement(deleteBidsSql)) {
+                    ps.setInt(1, auctionId);
+                    ps.executeUpdate();
+                }
 
-             conn.commit();
-             return affected > 0;
-         } catch (SQLException e) {
-             conn.rollback();
-             throw e;
-         } finally {
-             conn.setAutoCommit(true);
-         }
-     }
- }
+                try (PreparedStatement ps = conn.prepareStatement(deleteAutoBidsSql)) {
+                    ps.setInt(1, auctionId);
+                    ps.executeUpdate();
+                }
 
+                int affected;
+                try (PreparedStatement ps = conn.prepareStatement(deleteAuctionSql)) {
+                    ps.setInt(1, auctionId);
+                    affected = ps.executeUpdate();
+                }
 
+                conn.commit();
+                return affected > 0;
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+        }
+    }
 }
