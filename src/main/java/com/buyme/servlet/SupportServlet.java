@@ -24,13 +24,38 @@ public class SupportServlet extends HttpServlet {
             return;
         }
 
+        // NEW: optional keyword search parameter
+        String q = request.getParameter("q");
+        if (q != null && q.isBlank()) {
+            q = null;
+        }
+
         List<Map<String, Object>> tickets = new ArrayList<>();
 
         try (Connection conn = DBUtil.getConnection()) {
-            String sql = "SELECT ticket_id, subject, status, open_date, close_date, notes, cust_rep_id " +
-                         "FROM support_tickets WHERE user_id = ? ORDER BY open_date DESC";
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, userId);
+
+            StringBuilder sql = new StringBuilder(
+                    "SELECT ticket_id, subject, status, open_date, close_date, notes, cust_rep_id " +
+                    "FROM support_tickets WHERE user_id = ?"
+            );
+
+            // If a keyword is provided, search subject + notes
+            if (q != null) {
+                sql.append(" AND (subject LIKE ? OR notes LIKE ?)");
+            }
+
+            sql.append(" ORDER BY open_date DESC");
+
+            try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
+                int idx = 1;
+                ps.setInt(idx++, userId);
+
+                if (q != null) {
+                    String pattern = "%" + q.trim() + "%";
+                    ps.setString(idx++, pattern);
+                    ps.setString(idx++, pattern);
+                }
+
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
                         Map<String, Object> row = new HashMap<>();
@@ -50,7 +75,10 @@ public class SupportServlet extends HttpServlet {
             request.setAttribute("message", "DB error: " + e.getMessage());
         }
 
+        // expose tickets + current search term to JSP
         request.setAttribute("tickets", tickets);
+        request.setAttribute("q", q);
+
         request.getRequestDispatcher("/support.jsp").forward(request, response);
     }
 
@@ -85,7 +113,8 @@ public class SupportServlet extends HttpServlet {
                 ps.setString(3, description.trim());
                 ps.executeUpdate();
             }
-            request.setAttribute("message", "Your ticket has been submitted. A representative will review it soon.");
+            request.setAttribute("message",
+                    "Your ticket has been submitted. A representative will review it soon.");
         } catch (SQLException e) {
             e.printStackTrace();
             request.setAttribute("message", "DB error: " + e.getMessage());

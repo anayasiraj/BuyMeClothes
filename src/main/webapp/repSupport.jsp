@@ -37,25 +37,24 @@
         <a href="${pageContext.request.contextPath}/rep/support">Support</a>
         
         <%-- ADMIN-ONLY LINK --%>
-                <%
-                    String role = (String) session.getAttribute("role");
-                    if ("admin".equals(role)) {
-                %>
-                        <a href="admin/dashboard">Admin dashboard</a>
-                <%
-                    }
-                %>
+        <%
+            String role = (String) session.getAttribute("role");
+            if ("admin".equals(role)) {
+        %>
+            <a href="${pageContext.request.contextPath}/admin/dashboard">Admin dashboard</a>
+        <%
+            }
+        %>
                 
-                <%-- REP-ONLY LINK --%>
-                <%
-                    String role1 = (String) session.getAttribute("role");
-                    if ("cust_rep".equals(role1)) {
-                %>
-                        <a href="rep/dashboard">Rep dashboard</a>
-
-                <%
-                    }
-                %>
+        <%-- REP-ONLY LINK --%>
+        <%
+            String role1 = (String) session.getAttribute("role");
+            if ("cust_rep".equals(role1)) {
+        %>
+            <a href="${pageContext.request.contextPath}/rep/dashboard">Rep dashboard</a>
+        <%
+            }
+        %>
         
         <a href="${pageContext.request.contextPath}/logout">Logout</a>
     </nav>

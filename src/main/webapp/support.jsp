@@ -35,31 +35,32 @@
         <a href="${pageContext.request.contextPath}/sell">Sell</a>
         <a href="${pageContext.request.contextPath}/alerts">Alerts</a>
         <a href="${pageContext.request.contextPath}/support">Support</a>
-                
-                <%-- ADMIN-ONLY LINK --%>
-                <%
-                    String role = (String) session.getAttribute("role");
-                    if ("admin".equals(role)) {
-                %>
-                    <a href="admin/dashboard">Admin dashboard</a>
-                <%
-                    }
-                %>
-                
-                <%-- REP-ONLY LINK --%>
-                <%
-                    String role1 = (String) session.getAttribute("role");
-                    if ("cust_rep".equals(role1)) {
-                %>
-                    <a href="rep/dashboard">Rep dashboard</a>
-                <%
-                    }
-                %>
-                
-                
-                <a href="logout.jsp">Logout</a>
+
+        <%-- ADMIN-ONLY LINK --%>
+        <%
+            String role = (String) session.getAttribute("role");
+            if ("admin".equals(role)) {
+        %>
+            <a href="${pageContext.request.contextPath}/admin/dashboard">Admin dashboard</a>
+        <%
+            }
+        %>
+
+        <%-- REP-ONLY LINK --%>
+        <%
+            String role1 = (String) session.getAttribute("role");
+            if ("cust_rep".equals(role1)) {
+        %>
+            <!-- IMPORTANT: go to /repDashboard, not /rep/dashboard -->
+            <a href="${pageContext.request.contextPath}/repDashboard">Rep dashboard</a>
+        <%
+            }
+        %>
+
+        <a href="${pageContext.request.contextPath}/logout.jsp">Logout</a>
     </nav>
 </div>
+
 
 <div class="page-wrap">
     <div class="headline">Need help?</div>
@@ -97,11 +98,38 @@
         <h2 class="h5 mb-3">My tickets</h2>
 
         <%
+            @SuppressWarnings("unchecked")
             List<Map<String, Object>> tickets =
                     (List<Map<String, Object>>) request.getAttribute("tickets");
+            String q = (String) request.getAttribute("q");
+        %>
+
+        <!-- keyword search for questions & answers -->
+        <form class="row g-2 mb-3" method="get" action="${pageContext.request.contextPath}/support">
+            <div class="col-md-8">
+                <input type="text"
+                       name="q"
+                       class="form-control"
+                       placeholder="Search in your questions and rep answers..."
+                       value="<%= q != null ? q : "" %>">
+            </div>
+            <div class="col-md-4 d-grid">
+                <button type="submit" class="btn btn-outline-secondary">
+                    Search tickets
+                </button>
+            </div>
+        </form>
+
+        <%
             if (tickets == null || tickets.isEmpty()) {
         %>
-            <p class="text-muted mb-0">You haven’t opened any tickets yet.</p>
+            <p class="text-muted mb-0">
+                <% if (q != null && !q.isBlank()) { %>
+                    No tickets match your search.
+                <% } else { %>
+                    You haven’t opened any tickets yet.
+                <% } %>
+            </p>
         <%
             } else {
         %>
@@ -120,22 +148,24 @@
                 <tbody>
                 <%
                     for (Map<String, Object> row : tickets) {
-                        String status = (String) row.get("status");
+                        String statusVal = (String) row.get("status");
                         String pillClass = "status-open";
-                        if ("in_progress".equals(status)) pillClass = "status-in_progress";
-                        else if ("closed".equals(status)) pillClass = "status-closed";
+                        if ("in_progress".equals(statusVal)) pillClass = "status-in_progress";
+                        else if ("closed".equals(statusVal)) pillClass = "status-closed";
                 %>
                 <tr>
                     <td><%= row.get("ticket_id") %></td>
                     <td><strong><%= row.get("subject") %></strong></td>
                     <td>
                         <span class="status-pill <%= pillClass %>">
-                            <%= status.replace("_", " ") %>
+                            <%= statusVal.replace("_", " ") %>
                         </span>
                     </td>
                     <td><%= row.get("open_date") %></td>
                     <td><%= row.get("close_date") == null ? "-" : row.get("close_date") %></td>
-                    <td style="max-width:300px; white-space:pre-wrap;"><%= row.get("notes") %></td>
+                    <td style="max-width:300px; white-space:pre-wrap;">
+                        <%= row.get("notes") == null ? "" : row.get("notes") %>
+                    </td>
                 </tr>
                 <%
                     }
